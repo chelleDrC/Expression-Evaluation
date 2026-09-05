@@ -146,6 +146,14 @@ def load_file():
     except OSError as e:
         messagebox.showerror("Could not open file", str(e))
         return
+    except UnicodeDecodeError:
+        # Not a text file, or not saved in UTF-8.
+        messagebox.showerror(
+            "Could not read file",
+            "This file is not readable as text.\n\n"
+            "Please choose a plain text .in file.",
+        )
+        return
 
     input_area.delete("1.0", tk.END)
     input_area.insert("1.0", content)
