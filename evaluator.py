@@ -46,9 +46,8 @@ def tokenize(expression):
             position += 1
             continue
 
-        number = re.match(r"(?:\d+(?:\.\d*)?|\.\d+)", expression[position:])
-        if number:
-            literal = number.group(0)
+        if number := re.match(r"(?:\d+(?:\.\d*)?|\.\d+)", expression[position:]):
+            literal = number[0]
             position += len(literal)
             if position < len(expression) and expression[position].isalpha():
                 raise CodeError(INVALID_CODE)
@@ -57,9 +56,8 @@ def tokenize(expression):
             expecting_operand = False
             continue
 
-        name = re.match(r"[A-Za-z][A-Za-z0-9]*", expression[position:])
-        if name:
-            value = name.group(0)
+        if name := re.match(r"[A-Za-z][A-Za-z0-9]*", expression[position:]):
+            value = name[0]
             position += len(value)
             tokens.append(("var", value))
             expecting_operand = False
@@ -67,7 +65,7 @@ def tokenize(expression):
 
         character = expression[position]
         if character in "+-":
-            operator = "u" + character if expecting_operand else character
+            operator = f"u{character}" if expecting_operand else character
             tokens.append(("op", operator))
             position += 1
             expecting_operand = operator in UNARY_OPERATORS
@@ -99,11 +97,17 @@ def validate(tokens):
     open_parentheses = 0
 
     for kind, value in tokens:
-        if kind in {"num", "var"}:
+        if kind == "num":
             if not expecting_operand:
                 raise CodeError(INVALID_CODE)
             expecting_operand = False
-        elif kind == "lpar":
+            continue
+        if kind == "var":
+            if not expecting_operand:
+                raise CodeError(INVALID_CODE)
+            expecting_operand = False
+            continue
+        if kind == "lpar":
             if not expecting_operand:
                 raise CodeError(INVALID_CODE)
             open_parentheses += 1
@@ -190,7 +194,7 @@ def evaluate_postfix(postfix, variables):
             values.append(value)
         elif kind == "var":
             if value not in variables:
-                raise CodeError("Undefined variable " + value)
+                raise CodeError(f"Undefined variable {value}")
             values.append(variables[value])
         elif value in UNARY_OPERATORS:
             if not values:
@@ -223,7 +227,7 @@ def format_postfix(postfix):
         if kind == "num":
             result.append(format_value(value))
         elif value in UNARY_OPERATORS:
-            result.append(value[1] + "u")
+            result.append(f"{value[1]}u")
         else:
             result.append(str(value))
     return " ".join(result)
@@ -245,11 +249,11 @@ def process_code(line, variables, variables_used):
     try:
         result = evaluate_postfix(postfix, variables)
     except CodeError as error:
-        raise CodeError(error.args[0], postfix_text)
+        raise CodeError(error.args[0], postfix_text) from error
 
     if target:
         variables[target] = result
-        return postfix_text, target + " = " + format_value(result)
+        return postfix_text, f"{target} = {format_value(result)}"
     return postfix_text, format_value(result)
 
 
@@ -260,8 +264,6 @@ def run(lines):
     output = []
 
     for line_number, line in enumerate(lines or [], start=1):
-        if not line.strip():
-            continue
         try:
             postfix, result = process_code(line, variables, variables_used)
         except CodeError as error:
