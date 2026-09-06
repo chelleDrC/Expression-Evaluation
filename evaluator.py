@@ -1,7 +1,24 @@
-"""Expression parsing, evaluation, state management, and output formatting."""
+"""
+PE00 - Expression Evaluation
+Expression parsing and evaluation engine.
+
+Responsibilities of this module:
+    - Parse assignments and arithmetic expressions
+    - Validate operators, operands, and parentheses
+    - Convert expressions to postfix notation
+    - Evaluate expressions while tracking variables
+    - Format results and errors for the graphical user interface
+
+The user interface and file loading live in main.py.
+"""
 
 import math
 import re
+
+
+# --------------------------------------------------------------------------
+# Parsing constants
+# --------------------------------------------------------------------------
 
 
 INVALID_CODE = "Invalid input code"
@@ -14,15 +31,27 @@ PRECEDENCE = {"+": 1, "-": 1, "*": 2, "/": 2, "%": 2,
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 
 
+# --------------------------------------------------------------------------
+# Errors
+# --------------------------------------------------------------------------
+
+
 class CodeError(Exception):
     """An expected error in one input code."""
 
 
+# --------------------------------------------------------------------------
+# Parsing and validation
+# --------------------------------------------------------------------------
+
+
 def is_valid_name(name):
+    """Return whether name follows the variable naming rules."""
     return bool(IDENTIFIER_PATTERN.fullmatch(name))
 
 
 def parse_code(line):
+    """Split an input line into an optional assignment and expression."""
     code = line.strip()
     if not code:
         raise CodeError(INVALID_CODE)
@@ -37,6 +66,7 @@ def parse_code(line):
 
 
 def tokenize(expression):
+    """Convert an expression string into typed numbers, names, and operators."""
     tokens = []
     position = 0
     expecting_operand = True
@@ -65,6 +95,7 @@ def tokenize(expression):
 
         character = expression[position]
         if character in "+-":
+            # A sign is unary when an operand is expected, such as in -5 or 2*-3.
             operator = f"u{character}" if expecting_operand else character
             tokens.append(("op", operator))
             position += 1
@@ -93,6 +124,7 @@ def tokenize(expression):
 
 
 def validate(tokens):
+    """Reject token sequences with invalid operand, operator, or parenthesis order."""
     expecting_operand = True
     open_parentheses = 0
 
@@ -128,6 +160,7 @@ def validate(tokens):
 
 
 def to_postfix(tokens):
+    """Convert infix tokens to postfix notation using the shunting-yard method."""
     postfix = []
     stack = []
 
@@ -162,12 +195,19 @@ def to_postfix(tokens):
     return postfix
 
 
+# --------------------------------------------------------------------------
+# Evaluation
+# --------------------------------------------------------------------------
+
+
 def integer_divide(left, right):
+    """Divide integers toward zero instead of using Python's floor division."""
     result = abs(left) // abs(right)
     return -result if (left < 0) != (right < 0) else result
 
 
 def apply_operator(operator, left, right):
+    """Apply one binary operator and enforce its type and zero-division rules."""
     if operator == "+":
         return left + right
     if operator == "-":
@@ -181,6 +221,7 @@ def apply_operator(operator, left, right):
             return integer_divide(left, right)
         return left / right
     if operator == "%":
+        # Modulo is defined only for integer operands in this evaluator.
         if not isinstance(left, int) or not isinstance(right, int):
             raise CodeError(INVALID_CODE)
         return left - integer_divide(left, right) * right
@@ -188,6 +229,7 @@ def apply_operator(operator, left, right):
 
 
 def evaluate_postfix(postfix, variables):
+    """Evaluate postfix tokens with a value stack and the current variables."""
     values = []
     for kind, value in postfix:
         if kind == "num":
@@ -213,7 +255,13 @@ def evaluate_postfix(postfix, variables):
     return values[0]
 
 
+# --------------------------------------------------------------------------
+# Output formatting
+# --------------------------------------------------------------------------
+
+
 def format_value(value):
+    """Format numeric results without unnecessary decimal or exponent noise."""
     if isinstance(value, int):
         return str(value)
     if math.isfinite(value) and value == int(value):
@@ -222,6 +270,7 @@ def format_value(value):
 
 
 def format_postfix(postfix):
+    """Render postfix tokens as the space-separated form shown to the user."""
     result = []
     for kind, value in postfix:
         if kind == "num":
@@ -233,7 +282,13 @@ def format_postfix(postfix):
     return " ".join(result)
 
 
+# --------------------------------------------------------------------------
+# Processing and report generation
+# --------------------------------------------------------------------------
+
+
 def process_code(line, variables, variables_used):
+    """Parse, validate, evaluate, and format one input line."""
     target, expression = parse_code(line)
     tokens = tokenize(expression)
     validate(tokens)
@@ -258,6 +313,7 @@ def process_code(line, variables, variables_used):
 
 
 def run(lines):
+    """Process all input lines and return the complete report for the GUI."""
     variables = {}
     variables_used = []
     errors = []
